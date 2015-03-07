@@ -2,45 +2,141 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
-	"strconv"
 )
 
 const bufferSize = 128
 
+type EventInterface interface {
+	String() string
+	scanRest(io.Reader) (EventInterface, error)
+
+	getSequenceId() int64
+	getType() string
+	getFromUserId() int64
+	getToUserId() int64
+}
+
 type Event struct {
-	SequenceId string
+	SequenceId int64
 	Type       string
-	FromUserId string
-	ToUserId   string
+	FromUserId int64
+	ToUserId   int64
+}
+
+type Follow struct {
+	Event
+}
+
+type Unfollow struct {
+	Event
+}
+
+type Broadcast struct {
+	Event
+}
+
+type PrivateMsg struct {
+	Event
+}
+
+type StatusUpdate struct {
+	Event
 }
 
 type Notification struct {
-	Event     Event
-	UserId    string
+	Event     EventInterface
+	UserId    int64
 	Broadcast bool
 }
 
+func (event Event) getSequenceId() int64 { return event.SequenceId }
+func (event Event) getType() string      { return event.Type }
+func (event Event) getFromUserId() int64 { return event.FromUserId }
+func (event Event) getToUserId() int64   { return event.ToUserId }
+
+func (event Event) Lift() EventInterface {
+	switch event.Type {
+	case "F":
+		return Follow{event}
+	case "U":
+		return Unfollow{event}
+	case "B":
+		return Broadcast{event}
+	case "P":
+		return PrivateMsg{event}
+	case "S":
+		return StatusUpdate{event}
+	}
+	return event
+}
+
 func (event Event) String() string {
-	result := []rune("")
+	return fmt.Sprintf(
+		"%d|%s|%d|%d",
+		event.SequenceId,
+		event.Type,
+		event.FromUserId,
+		event.ToUserId,
+	)
+}
 
-	result = append(result, []rune(event.SequenceId)...)
+func (event Broadcast) String() string {
+	return fmt.Sprintf(
+		"%d|%s",
+		event.SequenceId,
+		event.Type,
+	)
+}
 
-	result = append(result, '|')
-	result = append(result, []rune(event.Type)...)
+func (event StatusUpdate) String() string {
+	return fmt.Sprintf(
+		"%d|%s|%d",
+		event.SequenceId,
+		event.Type,
+		event.FromUserId,
+	)
+}
 
-	if event.FromUserId != "" {
-		result = append(result, '|')
-		result = append(result, []rune(event.FromUserId)...)
+func scanEvent(reader io.Reader) (EventInterface, error) {
+	var eventSequenceId int64
+	var eventType string
+
+	_, error := fmt.Fscanf(reader, "%d|%1s", &eventSequenceId, &eventType)
+	if error != nil {
+		return Event{}, nil
 	}
 
-	if event.ToUserId != "" {
-		result = append(result, '|')
-		result = append(result, []rune(event.ToUserId)...)
+	event := Event{
+		SequenceId: eventSequenceId,
+		Type:       eventType,
 	}
 
-	return string(result)
+	return event.Lift().scanRest(reader)
+}
+
+func (event Event) scanRest(reader io.Reader) (EventInterface, error) {
+	_, error := fmt.Fscanf(reader, "|%d|%d\r\n", &event.FromUserId, &event.ToUserId)
+	if error != nil {
+		return Event{}, nil
+	}
+
+	return event, nil
+}
+
+func (event Broadcast) scanRest(reader io.Reader) (EventInterface, error) {
+	return event, nil
+}
+
+func (event StatusUpdate) scanRest(reader io.Reader) (EventInterface, error) {
+	_, error := fmt.Fscanf(reader, "|%d\r\n", &event.FromUserId)
+	if error != nil {
+		return Event{}, nil
+	}
+
+	return event, nil
 }
 
 func main() {
@@ -64,7 +160,7 @@ func main() {
 	userClientsDone := make(chan bool)
 
 	userClientsInbox := make(chan Notification)
-	relationshipsInbox := make(chan Event)
+	relationshipsInbox := make(chan EventInterface)
 
 	go handleSourceEvents(eventSourceListener, eventSourceDone, relationshipsInbox)
 	go handleUserClients(userClientsListener, userClientsDone, userClientsInbox)
@@ -74,7 +170,7 @@ func main() {
 	<-userClientsDone
 }
 
-func handleSourceEvents(listener net.Listener, done chan bool, relationshipsInbox chan Event) {
+func handleSourceEvents(listener net.Listener, done chan bool, relationshipsInbox chan EventInterface) {
 	for {
 		connection, error := listener.Accept()
 		if error != nil {
@@ -88,7 +184,7 @@ func handleSourceEvents(listener net.Listener, done chan bool, relationshipsInbo
 }
 
 func handleUserClients(listener net.Listener, done chan bool, userClientsInbox chan Notification) {
-	clients := make(map[string]net.Conn)
+	clients := make(map[int64]net.Conn)
 
 	go func() {
 		for {
@@ -100,8 +196,8 @@ func handleUserClients(listener net.Listener, done chan bool, userClientsInbox c
 			defer connection.Close()
 
 			go func() {
-				userId := ""
-				_, error := fmt.Fscanf(connection, "%s\r\n", &userId)
+				userId := int64(0)
+				_, error := fmt.Fscanf(connection, "%d\r\n", &userId)
 				if error != nil {
 					log.Print(error)
 				}
@@ -121,7 +217,7 @@ func handleUserClients(listener net.Listener, done chan bool, userClientsInbox c
 
 			for userId, client := range clients {
 				if client != nil {
-					log.Printf("Send notification %s to user %s\n\n", notification.Event, userId)
+					log.Printf("Send notification %s to user %d\n\n", notification.Event, userId)
 					fmt.Fprintf(client, "%s\r\n", notification.Event)
 				}
 			}
@@ -130,7 +226,7 @@ func handleUserClients(listener net.Listener, done chan bool, userClientsInbox c
 
 			client := clients[notification.UserId]
 			if client != nil {
-				log.Printf("Send notification %s to user %s\n\n", notification.Event, notification.UserId)
+				log.Printf("Send notification %s to user %d\n\n", notification.Event, notification.UserId)
 				fmt.Fprintf(client, "%s\r\n", notification.Event)
 			}
 
@@ -141,9 +237,9 @@ func handleUserClients(listener net.Listener, done chan bool, userClientsInbox c
 	done <- true
 }
 
-func handleRelationships(relationshipsInbox chan Event, userClientsInbox chan Notification) {
-	follows := make(map[string]map[string]bool)
-	lastSeenSequenceId := 0
+func handleRelationships(relationshipsInbox chan EventInterface, userClientsInbox chan Notification) {
+	follows := make(map[int64]map[int64]bool)
+	lastSeenSequenceId := int64(0)
 
 	for {
 		event, ok := <-relationshipsInbox
@@ -151,34 +247,28 @@ func handleRelationships(relationshipsInbox chan Event, userClientsInbox chan No
 			break
 		}
 
-		sequenceId, error := strconv.Atoi(event.SequenceId)
-		if error != nil {
-			log.Print(error)
-			continue
-		}
+		if lastSeenSequenceId+1 == event.getSequenceId() {
 
-		if lastSeenSequenceId+1 == sequenceId {
+			lastSeenSequenceId = event.getSequenceId()
 
-			lastSeenSequenceId = sequenceId
-
-			switch event.Type {
+			switch event.getType() {
 
 			case "F":
-				if follows[event.ToUserId] == nil {
-					follows[event.ToUserId] = make(map[string]bool)
+				if follows[event.getToUserId()] == nil {
+					follows[event.getToUserId()] = make(map[int64]bool)
 				}
-				follows[event.ToUserId][event.FromUserId] = true
+				follows[event.getToUserId()][event.getFromUserId()] = true
 
 				userClientsInbox <- Notification{
 					Event:  event,
-					UserId: event.ToUserId,
+					UserId: event.getToUserId(),
 				}
 
 			case "U":
-				if follows[event.ToUserId] == nil {
-					follows[event.ToUserId] = make(map[string]bool)
+				if follows[event.getToUserId()] == nil {
+					follows[event.getToUserId()] = make(map[int64]bool)
 				}
-				delete(follows[event.ToUserId], event.FromUserId)
+				delete(follows[event.getToUserId()], event.getFromUserId())
 
 			case "B":
 				userClientsInbox <- Notification{
@@ -189,11 +279,11 @@ func handleRelationships(relationshipsInbox chan Event, userClientsInbox chan No
 			case "P":
 				userClientsInbox <- Notification{
 					Event:  event,
-					UserId: event.ToUserId,
+					UserId: event.getToUserId(),
 				}
 
 			case "S":
-				for followerId := range follows[event.FromUserId] {
+				for followerId := range follows[event.getFromUserId()] {
 					userClientsInbox <- Notification{
 						Event:  event,
 						UserId: followerId,
@@ -211,91 +301,13 @@ func handleRelationships(relationshipsInbox chan Event, userClientsInbox chan No
 	}
 }
 
-func handleEventSourceConnection(connection net.Conn, relationshipsInbox chan Event) {
+func handleEventSourceConnection(connection net.Conn, relationshipsInbox chan EventInterface) {
 	defer connection.Close()
 
-	buffer := make([]byte, bufferSize)
-
-	eventString := []rune("")
-
-	state := "waitSequenceId"
-
-	eventSequenceId := []rune("")
-	eventType := []rune("")
-	eventFromUserId := []rune("")
-	eventToUserId := []rune("")
-
-	event := Event{}
-
 	for {
-		count, error := connection.Read(buffer)
-		if error != nil {
-			log.Print(error)
-			break
-		}
-
-		for _, value := range string(buffer[:count]) {
-			switch value {
-
-			case '\n':
-				switch state {
-				case "waitType":
-					event.Type = string(eventType)
-					eventType = []rune("")
-				case "waitFromUserId":
-					event.FromUserId = string(eventFromUserId)
-					eventFromUserId = []rune("")
-				case "waitToUserId":
-					event.ToUserId = string(eventToUserId)
-					eventToUserId = []rune("")
-				}
-
-				relationshipsInbox <- event
-				event = Event{}
-				eventString = []rune("")
-				state = "waitSequenceId"
-
-			case '\r':
-
-			default:
-
-				eventString = append(eventString, value)
-
-				switch state {
-
-				case "waitSequenceId":
-					if value == '|' {
-						event.SequenceId = string(eventSequenceId)
-						eventSequenceId = []rune("")
-						state = "waitType"
-					} else {
-						eventSequenceId = append(eventSequenceId, value)
-					}
-
-				case "waitType":
-					if value == '|' {
-						event.Type = string(eventType)
-						eventType = []rune("")
-						state = "waitFromUserId"
-					} else {
-						eventType = append(eventType, value)
-					}
-
-				case "waitFromUserId":
-					if value == '|' {
-						event.FromUserId = string(eventFromUserId)
-						eventFromUserId = []rune("")
-						state = "waitToUserId"
-					} else {
-						eventFromUserId = append(eventFromUserId, value)
-					}
-
-				case "waitToUserId":
-					eventToUserId = append(eventToUserId, value)
-
-				default:
-				}
-			}
+		event, error := scanEvent(connection)
+		if error == nil {
+			relationshipsInbox <- event
 		}
 	}
 }
