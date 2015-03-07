@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/waterlink/goactor"
 	"io"
 )
 
 type EventInterface interface {
 	String() string
-	Handle(map[int64]map[int64]bool, chan Notification)
+	Handle(FollowMap, UserNotifications)
 
 	scanRest(io.Reader) (EventInterface, error)
 
@@ -131,48 +132,48 @@ func (event StatusUpdate) scanRest(reader io.Reader) (EventInterface, error) {
 	return event, nil
 }
 
-func (event Event) Handle(follows map[int64]map[int64]bool, clientsInbox chan Notification) {
-	event.Lift().Handle(follows, clientsInbox)
+func (event Event) Handle(follows FollowMap, userNotifications UserNotifications) {
+	event.Lift().Handle(follows, userNotifications)
 }
 
-func (event Follow) Handle(follows map[int64]map[int64]bool, clientsInbox chan Notification) {
+func (event Follow) Handle(follows FollowMap, userNotifications UserNotifications) {
 	if follows[event.getToUserId()] == nil {
-		follows[event.getToUserId()] = make(map[int64]bool)
+		follows[event.getToUserId()] = NewFollowMapValue()
 	}
 	follows[event.getToUserId()][event.getFromUserId()] = true
 
-	clientsInbox <- Notification{
+	goactor.Send(userNotifications, Notification{
 		Event:  event,
 		UserId: event.getToUserId(),
-	}
+	})
 }
 
-func (event Unfollow) Handle(follows map[int64]map[int64]bool, clientsInbox chan Notification) {
+func (event Unfollow) Handle(follows FollowMap, userNotifications UserNotifications) {
 	if follows[event.getToUserId()] == nil {
-		follows[event.getToUserId()] = make(map[int64]bool)
+		follows[event.getToUserId()] = NewFollowMapValue()
 	}
 	delete(follows[event.getToUserId()], event.getFromUserId())
 }
 
-func (event Broadcast) Handle(follows map[int64]map[int64]bool, clientsInbox chan Notification) {
-	clientsInbox <- Notification{
+func (event Broadcast) Handle(follows FollowMap, userNotifications UserNotifications) {
+	goactor.Send(userNotifications, Notification{
 		Event:     event,
 		Broadcast: true,
-	}
+	})
 }
 
-func (event PrivateMsg) Handle(follows map[int64]map[int64]bool, clientsInbox chan Notification) {
-	clientsInbox <- Notification{
+func (event PrivateMsg) Handle(follows FollowMap, userNotifications UserNotifications) {
+	goactor.Send(userNotifications, Notification{
 		Event:  event,
 		UserId: event.getToUserId(),
-	}
+	})
 }
 
-func (event StatusUpdate) Handle(follows map[int64]map[int64]bool, clientsInbox chan Notification) {
+func (event StatusUpdate) Handle(follows FollowMap, userNotifications UserNotifications) {
 	for followerId := range follows[event.getFromUserId()] {
-		clientsInbox <- Notification{
+		goactor.Send(userNotifications, Notification{
 			Event:  event,
 			UserId: followerId,
-		}
+		})
 	}
 }
