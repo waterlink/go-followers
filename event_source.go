@@ -14,7 +14,7 @@ type EventSource struct {
 func (this *EventSource) Act(message goactor.Any) {
 	if event, error := scanEvent(this.connection); error == nil {
 
-		this.userRelationships.SyncSend(&event)
+		this.userRelationships.Send(&event)
 		this.Send(message)
 
 	} else {

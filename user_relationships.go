@@ -2,8 +2,6 @@ package main
 
 import (
 	"github.com/waterlink/goactor"
-	//"log"
-	//"runtime"
 )
 
 type FollowMapValue map[int64]bool
@@ -33,7 +31,7 @@ func NewEventMap() EventMap {
 func (this *UserRelationships) Act(message goactor.Any) {
 	if event, ok := message.(*EventInterface); ok {
 
-		this.bufferedEvents[(*event).getSequenceId] = event
+		this.bufferedEvents[(*event).getSequenceId()] = event
 
 		for eventFromBuffer, ok := this.bufferedEvents[this.lastSeenSequenceId+1]; ok; eventFromBuffer, ok = this.bufferedEvents[this.lastSeenSequenceId+1] {
 
@@ -42,18 +40,5 @@ func (this *UserRelationships) Act(message goactor.Any) {
 			(*eventFromBuffer).Handle(&this.follows, this.userNotifications)
 
 		}
-
-		//if eventFromBuffer, ok := this.bufferedEvents[this.lastSeenSequenceId+1]; ok {
-
-		//	this.lastSeenSequenceId = eventId
-		//	(*event).Handle(&this.follows, this.userNotifications)
-
-		//} else {
-
-		//	//log.Printf("goroutines: %d\n", runtime.NumGoroutine())
-		//	//this.Send(event)
-		//	this.bufferedEvents[(*event).getSequenceId()] = event
-
-		//}
 	}
 }
