@@ -42,6 +42,7 @@ func main() {
 		follows:            NewFollowMap(),
 		lastSeenSequenceId: int64(0),
 		userNotifications:  userNotifications,
+		bufferedEvents:     NewEventMap(),
 	}
 	goactor.Go(userRelationships, "user relationships")
 
