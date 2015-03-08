@@ -8,7 +8,7 @@ import (
 
 type UserNotifications struct {
 	goactor.Actor
-	clients UserClients
+	clients *UserClients
 }
 
 type Notification struct {
@@ -17,14 +17,14 @@ type Notification struct {
 	Broadcast bool
 }
 
-func (this UserNotifications) Act(message goactor.Any) {
-	if notification, ok := message.(Notification); ok {
+func (this *UserNotifications) Act(message goactor.Any) {
+	if notification, ok := message.(*Notification); ok {
 		if notification.Broadcast {
 
 			for userId, client := range this.clients.Clients {
 				if client != nil {
-					log.Printf("Send notification %s to user %d\n\n", notification.Event, userId)
-					fmt.Fprintf(client, "%s\r\n", notification.Event)
+					log.Printf("Send notification %s to user %d\n", notification.Event, userId)
+					fmt.Fprintf(*client, "%s\r\n", notification.Event)
 				}
 			}
 
@@ -32,8 +32,8 @@ func (this UserNotifications) Act(message goactor.Any) {
 
 			client := this.clients.Clients[notification.UserId]
 			if client != nil {
-				log.Printf("Send notification %s to user %d\n\n", notification.Event, notification.UserId)
-				fmt.Fprintf(client, "%s\r\n", notification.Event)
+				log.Printf("Send notification %s to user %d\n", notification.Event, notification.UserId)
+				fmt.Fprintf(*client, "%s\r\n", notification.Event)
 			}
 
 		}

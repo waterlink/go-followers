@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/waterlink/goactor"
 	"io"
 )
 
 type EventInterface interface {
 	String() string
-	Handle(FollowMap, UserNotifications)
+	Handle(*FollowMap, *UserNotifications)
 
 	scanRest(io.Reader) (EventInterface, error)
 
@@ -99,7 +98,7 @@ func scanEvent(reader io.Reader) (EventInterface, error) {
 
 	_, error := fmt.Fscanf(reader, "%d|%1s", &eventSequenceId, &eventType)
 	if error != nil {
-		return Event{}, nil
+		return Event{}, error
 	}
 
 	event := Event{
@@ -113,66 +112,71 @@ func scanEvent(reader io.Reader) (EventInterface, error) {
 func (event Event) scanRest(reader io.Reader) (EventInterface, error) {
 	_, error := fmt.Fscanf(reader, "|%d|%d\r\n", &event.FromUserId, &event.ToUserId)
 	if error != nil {
-		return Event{}, nil
+		return Event{}, error
 	}
 
 	return event, nil
 }
 
 func (event Broadcast) scanRest(reader io.Reader) (EventInterface, error) {
+	_, error := fmt.Fscanf(reader, "\r\n")
+	if error != nil {
+		return Event{}, error
+	}
+
 	return event, nil
 }
 
 func (event StatusUpdate) scanRest(reader io.Reader) (EventInterface, error) {
 	_, error := fmt.Fscanf(reader, "|%d\r\n", &event.FromUserId)
 	if error != nil {
-		return Event{}, nil
+		return Event{}, error
 	}
 
 	return event, nil
 }
 
-func (event Event) Handle(follows FollowMap, userNotifications UserNotifications) {
+func (event Event) Handle(follows *FollowMap, userNotifications *UserNotifications) {
 	event.Lift().Handle(follows, userNotifications)
 }
 
-func (event Follow) Handle(follows FollowMap, userNotifications UserNotifications) {
-	if follows[event.getToUserId()] == nil {
-		follows[event.getToUserId()] = NewFollowMapValue()
+func (event Follow) Handle(follows *FollowMap, userNotifications *UserNotifications) {
+	if (*follows)[event.getToUserId()] == nil {
+		(*follows)[event.getToUserId()] = NewFollowMapValue()
 	}
-	follows[event.getToUserId()][event.getFromUserId()] = true
+	(*follows)[event.getToUserId()][event.getFromUserId()] = true
 
-	goactor.Send(userNotifications, Notification{
-		Event:  event,
+	userNotifications.Send(&Notification{
+		Event:  &event,
 		UserId: event.getToUserId(),
 	})
 }
 
-func (event Unfollow) Handle(follows FollowMap, userNotifications UserNotifications) {
-	if follows[event.getToUserId()] == nil {
-		follows[event.getToUserId()] = NewFollowMapValue()
+func (event Unfollow) Handle(follows *FollowMap, userNotifications *UserNotifications) {
+	if (*follows)[event.getToUserId()] == nil {
+		(*follows)[event.getToUserId()] = NewFollowMapValue()
 	}
-	delete(follows[event.getToUserId()], event.getFromUserId())
+	delete((*follows)[event.getToUserId()], event.getFromUserId())
 }
 
-func (event Broadcast) Handle(follows FollowMap, userNotifications UserNotifications) {
-	goactor.Send(userNotifications, Notification{
-		Event:     event,
+func (event Broadcast) Handle(follows *FollowMap, userNotifications *UserNotifications) {
+	userNotifications.Send(&Notification{
+		Event:     &event,
 		Broadcast: true,
 	})
 }
 
-func (event PrivateMsg) Handle(follows FollowMap, userNotifications UserNotifications) {
-	goactor.Send(userNotifications, Notification{
-		Event:  event,
+func (event PrivateMsg) Handle(follows *FollowMap, userNotifications *UserNotifications) {
+	userNotifications.Send(&Notification{
+		Event:  &event,
 		UserId: event.getToUserId(),
 	})
 }
 
-func (event StatusUpdate) Handle(follows FollowMap, userNotifications UserNotifications) {
-	for followerId := range follows[event.getFromUserId()] {
-		goactor.Send(userNotifications, Notification{
-			Event:  event,
+func (event StatusUpdate) Handle(follows *FollowMap, userNotifications *UserNotifications) {
+	for followerId := range (*follows)[event.getFromUserId()] {
+		userNotifications.Send(&Notification{
+			Event:  &event,
 			UserId: followerId,
 		})
 	}

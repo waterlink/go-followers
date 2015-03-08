@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/waterlink/goactor"
-	"log"
 )
 
 type FollowMapValue map[int64]bool
@@ -12,7 +11,7 @@ type UserRelationships struct {
 	goactor.Actor
 	follows            FollowMap
 	lastSeenSequenceId int64
-	userNotifications  UserNotifications
+	userNotifications  *UserNotifications
 }
 
 func NewFollowMap() FollowMap {
@@ -23,19 +22,17 @@ func NewFollowMapValue() FollowMapValue {
 	return make(FollowMapValue)
 }
 
-func (this UserRelationships) Act(message goactor.Any) {
-	if event, ok := message.(EventInterface); ok {
-		log.Print("got event")
-		log.Print(event)
+func (this *UserRelationships) Act(message goactor.Any) {
+	if event, ok := message.(*EventInterface); ok {
 
-		if this.lastSeenSequenceId+1 == event.getSequenceId() {
+		if eventId := (*event).getSequenceId(); this.lastSeenSequenceId+1 == eventId {
 
-			this.lastSeenSequenceId = event.getSequenceId()
-			event.Handle(this.follows, this.userNotifications)
+			this.lastSeenSequenceId = eventId
+			(*event).Handle(&this.follows, this.userNotifications)
 
 		} else {
 
-			goactor.Send(this, event)
+			this.Send(event)
 
 		}
 	}

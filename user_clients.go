@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-type ClientMap map[int64]net.Conn
+type ClientMap map[int64]*net.Conn
 
 type UserClients struct {
 	goactor.Actor
@@ -18,10 +18,10 @@ func NewClients() ClientMap {
 	return make(ClientMap)
 }
 
-func (this UserClients) Act(message goactor.Any) {
-	if connection, ok := message.(net.Conn); ok {
+func (this *UserClients) Act(message goactor.Any) {
+	if connection, ok := message.(*net.Conn); ok {
 		userId := int64(0)
-		_, error := fmt.Fscanf(connection, "%d\r\n", &userId)
+		_, error := fmt.Fscanf(*connection, "%d\r\n", &userId)
 		if error != nil {
 			return
 		}

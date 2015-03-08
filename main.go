@@ -25,19 +25,19 @@ func main() {
 	}
 	defer userClientsListener.Close()
 
-	userClients := UserClients{
+	userClients := &UserClients{
 		Actor:   goactor.NewActor(),
 		Clients: NewClients(),
 	}
 	goactor.Go(userClients, "user clients")
 
-	userNotifications := UserNotifications{
+	userNotifications := &UserNotifications{
 		Actor:   goactor.NewActor(),
 		clients: userClients,
 	}
 	goactor.Go(userNotifications, "user notifications")
 
-	userRelationships := UserRelationships{
+	userRelationships := &UserRelationships{
 		Actor:              goactor.NewActor(),
 		follows:            NewFollowMap(),
 		lastSeenSequenceId: int64(0),
@@ -53,7 +53,7 @@ func main() {
 	<-eventSourceDone
 }
 
-func handleSourceEvents(listener net.Listener, done chan bool, userRelationships UserRelationships) {
+func handleSourceEvents(listener net.Listener, done chan bool, userRelationships *UserRelationships) {
 	for {
 		connection, error := listener.Accept()
 		if error != nil {
@@ -61,18 +61,18 @@ func handleSourceEvents(listener net.Listener, done chan bool, userRelationships
 			break
 		}
 
-		eventSource := EventSource{
+		eventSource := &EventSource{
 			Actor:             goactor.NewActor(),
 			connection:        connection,
 			userRelationships: userRelationships,
 		}
 		goactor.Go(eventSource, "event source")
-		goactor.Send(eventSource, true)
+		eventSource.Send(true)
 	}
 	done <- true
 }
 
-func handleUserClients(listener net.Listener, userClients UserClients) {
+func handleUserClients(listener net.Listener, userClients *UserClients) {
 	for {
 		connection, error := listener.Accept()
 		if error != nil {
@@ -81,6 +81,6 @@ func handleUserClients(listener net.Listener, userClients UserClients) {
 		}
 		defer connection.Close()
 
-		goactor.Send(userClients, connection)
+		userClients.Send(&connection)
 	}
 }
