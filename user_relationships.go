@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/waterlink/goactor"
+	//"log"
+	//"runtime"
 )
 
 type FollowMapValue map[int64]bool
@@ -32,6 +34,7 @@ func (this *UserRelationships) Act(message goactor.Any) {
 
 		} else {
 
+			//log.Printf("goroutines: %d\n", runtime.NumGoroutine())
 			this.Send(event)
 
 		}
