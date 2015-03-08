@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/waterlink/goactor"
 	"log"
-	"net"
 )
 
 type UserNotifications struct {
@@ -18,7 +17,7 @@ type Notification struct {
 	Broadcast bool
 }
 
-func sendTo(userId int64, client *net.Conn, notification *Notification) {
+func sendTo(userId int64, client *ClientConnection, notification *Notification) {
 	if client != nil {
 		log.Printf("send %s to %d\n", notification.Event, userId)
 		fmt.Fprintf(*client, "%s\r\n", notification.Event)

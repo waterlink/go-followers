@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/waterlink/goactor"
-	"net"
 )
 
 type UserClients struct {
@@ -12,7 +11,7 @@ type UserClients struct {
 }
 
 func (this *UserClients) Act(message goactor.Any) {
-	if connection, ok := message.(*net.Conn); ok {
+	if connection, ok := message.(*ClientConnection); ok {
 		userId := int64(0)
 		_, error := fmt.Fscanf(*connection, "%d\r\n", &userId)
 		if error != nil {

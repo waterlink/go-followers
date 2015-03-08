@@ -82,6 +82,7 @@ func handleUserClients(listener net.Listener, userClients *UserClients) {
 		}
 		defer connection.Close()
 
-		userClients.Send(&connection)
+		clientConnection, _ := connection.(ClientConnection)
+		userClients.Send(&clientConnection)
 	}
 }

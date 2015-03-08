@@ -1,10 +1,16 @@
 package main
 
 import (
-	"net"
+	"io"
 )
 
-type ClientMap map[int64]*net.Conn
+type ClientConnection interface {
+	io.Reader
+	io.Writer
+	io.Closer
+}
+
+type ClientMap map[int64]*ClientConnection
 
 func NewClients() ClientMap {
 	return make(ClientMap)

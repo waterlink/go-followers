@@ -27,8 +27,8 @@ func TestLift(t *testing.T) {
 		FromUserId: 498,
 		ToUserId:   99,
 	}
-	expectToBeA(t, followEvent, "Event")
-	expectToBeA(t, followEvent.Lift(), "Follow")
+	expectEventToBeA(t, followEvent, "Event")
+	expectEventToBeA(t, followEvent.Lift(), "Follow")
 
 	unfollowEvent := Event{
 		SequenceId: 77,
@@ -36,15 +36,15 @@ func TestLift(t *testing.T) {
 		FromUserId: 498,
 		ToUserId:   99,
 	}
-	expectToBeA(t, unfollowEvent, "Event")
-	expectToBeA(t, unfollowEvent.Lift(), "Unfollow")
+	expectEventToBeA(t, unfollowEvent, "Event")
+	expectEventToBeA(t, unfollowEvent.Lift(), "Unfollow")
 
 	broadcastEvent := Event{
 		SequenceId: 126,
 		Type:       "B",
 	}
-	expectToBeA(t, broadcastEvent, "Event")
-	expectToBeA(t, broadcastEvent.Lift(), "Broadcast")
+	expectEventToBeA(t, broadcastEvent, "Event")
+	expectEventToBeA(t, broadcastEvent.Lift(), "Broadcast")
 
 	privateMsgEvent := Event{
 		SequenceId: 77,
@@ -52,16 +52,16 @@ func TestLift(t *testing.T) {
 		FromUserId: 498,
 		ToUserId:   99,
 	}
-	expectToBeA(t, privateMsgEvent, "Event")
-	expectToBeA(t, privateMsgEvent.Lift(), "PrivateMsg")
+	expectEventToBeA(t, privateMsgEvent, "Event")
+	expectEventToBeA(t, privateMsgEvent.Lift(), "PrivateMsg")
 
 	statusUpdateEvent := Event{
 		SequenceId: 99,
 		Type:       "S",
 		FromUserId: 42,
 	}
-	expectToBeA(t, statusUpdateEvent, "Event")
-	expectToBeA(t, statusUpdateEvent.Lift(), "StatusUpdate")
+	expectEventToBeA(t, statusUpdateEvent, "Event")
+	expectEventToBeA(t, statusUpdateEvent.Lift(), "StatusUpdate")
 }
 
 func TestString(t *testing.T) {
