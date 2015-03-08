@@ -7,8 +7,6 @@ import (
 	"net"
 )
 
-type ClientMap map[int64]*net.Conn
-
 type UserClients struct {
 	goactor.Actor
 	Clients ClientMap
@@ -27,6 +25,13 @@ func (this *UserClients) Act(message goactor.Any) {
 		}
 
 		log.Printf("user connected: %d\n", userId)
-		this.Clients[userId] = connection
+
+		client := &Client{
+			Actor:      goactor.NewActor(),
+			userId:     userId,
+			connection: connection,
+		}
+		this.Clients[userId] = client
+		goactor.Go(client, fmt.Sprintf("client %s", userId))
 	}
 }

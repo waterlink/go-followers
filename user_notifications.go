@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"github.com/waterlink/goactor"
-	"log"
 )
 
 type UserNotifications struct {
@@ -17,24 +15,23 @@ type Notification struct {
 	Broadcast bool
 }
 
+func sendTo(client *Client, notification *Notification) {
+	if client != nil {
+		client.Send(&notification.Event)
+	}
+}
+
 func (this *UserNotifications) Act(message goactor.Any) {
 	if notification, ok := message.(*Notification); ok {
 		if notification.Broadcast {
 
-			for userId, client := range this.clients.Clients {
-				if client != nil {
-					log.Printf("Send notification %s to user %d\n", notification.Event, userId)
-					fmt.Fprintf(*client, "%s\r\n", notification.Event)
-				}
+			for _, client := range this.clients.Clients {
+				sendTo(client, notification)
 			}
 
 		} else {
 
-			client := this.clients.Clients[notification.UserId]
-			if client != nil {
-				log.Printf("Send notification %s to user %d\n", notification.Event, notification.UserId)
-				fmt.Fprintf(*client, "%s\r\n", notification.Event)
-			}
+			sendTo(this.clients.Clients[notification.UserId], notification)
 
 		}
 	}

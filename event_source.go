@@ -19,8 +19,8 @@ func (this *EventSource) Act(message goactor.Any) {
 
 	} else {
 
-		//this.connection.Close()
-		//this.Die()
+		this.connection.Close()
+		this.Die()
 
 	}
 }
