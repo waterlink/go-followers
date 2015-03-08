@@ -8,6 +8,7 @@ import (
 type EventInterface interface {
 	String() string
 	Handle(*FollowMap, *UserNotifications)
+	Lift() EventInterface
 
 	scanRest(io.Reader) (EventInterface, error)
 

@@ -2,12 +2,17 @@ package main
 
 import (
 	"github.com/waterlink/goactor"
-	"net"
+	"io"
 )
+
+type Connection interface {
+	io.Reader
+	io.Closer
+}
 
 type EventSource struct {
 	goactor.Actor
-	connection        net.Conn
+	connection        Connection
 	userRelationships *UserRelationships
 }
 
