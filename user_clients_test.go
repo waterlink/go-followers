@@ -13,13 +13,13 @@ func TestUserConnectionReceive(t *testing.T) {
 	}
 	clients := &userClients.Clients
 
-	userA := FakeClientConnection{strings.NewReader("79\r\n")}
-	userB := FakeClientConnection{strings.NewReader("936\r\n")}
-	broken := FakeClientConnection{strings.NewReader("noise")}
+	userA := FakeClientConnection{Reader: strings.NewReader("79\r\n")}
+	userB := FakeClientConnection{Reader: strings.NewReader("936\r\n")}
+	broken := FakeClientConnection{Reader: strings.NewReader("noise")}
 
-	userAConnection := ClientConnection(userA)
-	userBConnection := ClientConnection(userB)
-	brokenConnection := ClientConnection(broken)
+	userAConnection := ClientConnection(&userA)
+	userBConnection := ClientConnection(&userB)
+	brokenConnection := ClientConnection(&broken)
 
 	userClients.Act(&userAConnection)
 	userClients.Act(&brokenConnection)
